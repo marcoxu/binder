@@ -1,0 +1,1 @@
+cmd_/home/android/kernel/binder-2.6.29/binder.ko := ld -r -m elf_x86_64 -T /usr/src/linux-source-2.6.38/scripts/module-common.lds --build-id  -o /home/android/kernel/binder-2.6.29/binder.ko /home/android/kernel/binder-2.6.29/binder.o /home/android/kernel/binder-2.6.29/binder.mod.o
