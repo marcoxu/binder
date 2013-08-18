@@ -25,6 +25,7 @@ void hexdump(void *_data, unsigned len)
     unsigned char *data = _data;
     unsigned count;
 
+    printf("hexdump:  _data %p len %d\n", _data, len);
     for (count = 0; count < len; count++) {
         if ((count & 15) == 0)
             fprintf(stderr,"%04x:", count);
@@ -48,7 +49,9 @@ void binder_dump_txn(struct binder_txn *txn)
             txn->target, txn->cookie, txn->code, txn->flags);
     fprintf(stderr,"  pid %8d  uid %8d  data %8d  offs %8d\n",
             txn->sender_pid, txn->sender_euid, txn->data_size, txn->offs_size);
+    printf("binder_dump_txn:  hexdump start\n");
     hexdump(txn->data, txn->data_size);
+    printf("binder_dump_txn:  hexdump done\n");
     while (count--) {
         obj = (void*) (((char*) txn->data) + *offs++);
         fprintf(stderr,"  - type %08x  flags %08x  ptr %p  cookie %p\n",
@@ -77,6 +80,24 @@ const char *cmd_name(uint32_t cmd)
 #else
 #define hexdump(a,b) do{} while (0)
 #define binder_dump_txn(txn)  do{} while (0)
+#define NAME(n) case n: return #n
+const char *cmd_name(uint32_t cmd)
+{
+    switch(cmd) {
+        NAME(BR_NOOP);
+        NAME(BR_TRANSACTION_COMPLETE);
+        NAME(BR_INCREFS);
+        NAME(BR_ACQUIRE);
+        NAME(BR_RELEASE);
+        NAME(BR_DECREFS);
+        NAME(BR_TRANSACTION);
+        NAME(BR_REPLY);
+        NAME(BR_FAILED_REPLY);
+        NAME(BR_DEAD_REPLY);
+        NAME(BR_DEAD_BINDER);
+    default: return "???";
+    }
+}
 #endif
 
 #define BIO_F_SHARED    0x01  /* needs to be buffer freed */
@@ -221,8 +242,10 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
     int r = 1;
     uint32_t *end = ptr + (size / 4);
 
+    printf("binder_parse res size %d\n", size);
     while (ptr < end) {
         uint32_t cmd = *ptr++;
+    printf("binder_parse cmd %ld %s\n", cmd, cmd_name(cmd));
 #if TRACE
         fprintf(stderr,"%s:\n", cmd_name(cmd));
 #endif
@@ -235,6 +258,7 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
         case BR_ACQUIRE:
         case BR_RELEASE:
         case BR_DECREFS:
+    printf("binder_parse %08x %08x\n", ptr[0], ptr[1]);
 #if TRACE
             fprintf(stderr,"  %08x %08x\n", ptr[0], ptr[1]);
 #endif
@@ -242,11 +266,14 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
             break;
         case BR_TRANSACTION: {
             struct binder_txn *txn = (void *) ptr;
+    printf("binder_parse BR_TRANSACTION\n");
             if ((end - ptr) * sizeof(uint32_t) < sizeof(struct binder_txn)) {
                 LOGE("parse: txn too small!\n");
                 return -1;
             }
+    printf("binder_parse BR_TRANSACTION: binder_dump_txn\n");
             binder_dump_txn(txn);
+    printf("binder_parse BR_TRANSACTION: func %p\n", func);
             if (func) {
                 unsigned rdata[256/4];
                 struct binder_io msg;
@@ -255,14 +282,17 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
 
                 bio_init(&reply, rdata, sizeof(rdata), 4);
                 bio_init_from_txn(&msg, txn);
+                printf("BR_TRANSACTION: call func\n");
                 res = func(bs, txn, &msg, &reply);
                 binder_send_reply(bs, &reply, txn->data, res);
             }
             ptr += sizeof(*txn) / sizeof(uint32_t);
+    printf("binder_parse BR_TRANSACTION: done\n");
             break;
         }
         case BR_REPLY: {
             struct binder_txn *txn = (void*) ptr;
+    printf("binder_parse BR_REPLY\n");
             if ((end - ptr) * sizeof(uint32_t) < sizeof(struct binder_txn)) {
                 LOGE("parse: reply too small!\n");
                 return -1;
@@ -295,6 +325,7 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
         }
     }
 
+    printf("binder_parse return r %d\n", r);
     return r;
 }
 
@@ -398,10 +429,10 @@ void binder_loop(struct binder_state *bs, binder_handler func)
         bwr.read_consumed = 0;
         bwr.read_buffer = (unsigned long) readbuf;
 
-        printf("ioctl BINDER_WRITE_READ start %ld, %ld, %ld\n", bwr.read_size, bwr.read_consumed, bwr.read_buffer);
-        printf("ioctl BINDER_WRITE_READ start %ld, %ld, %ld\n", bwr.write_size, bwr.write_consumed, bwr.write_buffer);
+        printf("ioctl BINDER_WRITE_READ start READ %ld, %ld, %ld\n", bwr.read_size, bwr.read_consumed, bwr.read_buffer);
+        printf("ioctl BINDER_WRITE_READ start WRITE %ld, %ld, %ld\n", bwr.write_size, bwr.write_consumed, bwr.write_buffer);
         res = ioctl(bs->fd, BINDER_WRITE_READ, &bwr);
-        printf("ioctl BINDER_WRITE_READ done\n");
+        printf("ioctl BINDER_WRITE_READ done res %d\n", res);
 
         if (res < 0) {
             LOGE("binder_loop: ioctl failed (%d)\n", errno);

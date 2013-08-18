@@ -221,8 +221,10 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
     int r = 1;
     uint32_t *end = ptr + (size / 4);
 
+    printf("binder_parse res size %d, cmd %d\n", size, cmd);
     while (ptr < end) {
         uint32_t cmd = *ptr++;
+    printf("binder_parse res cmd_name %s\n", cmd_name);
 #if TRACE
         fprintf(stderr,"%s:\n", cmd_name(cmd));
 #endif
@@ -235,6 +237,7 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
         case BR_ACQUIRE:
         case BR_RELEASE:
         case BR_DECREFS:
+    printf("binder_parse %08x %08x\n", ptr[0], ptr[1]);
 #if TRACE
             fprintf(stderr,"  %08x %08x\n", ptr[0], ptr[1]);
 #endif
@@ -242,6 +245,7 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
             break;
         case BR_TRANSACTION: {
             struct binder_txn *txn = (void *) ptr;
+    printf("binder_parse BR_TRANSACTION\n");
             if ((end - ptr) * sizeof(uint32_t) < sizeof(struct binder_txn)) {
                 LOGE("parse: txn too small!\n");
                 return -1;
@@ -264,6 +268,7 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
         }
         case BR_REPLY: {
             struct binder_txn *txn = (void*) ptr;
+    printf("binder_parse BR_REPLY\n");
             if ((end - ptr) * sizeof(uint32_t) < sizeof(struct binder_txn)) {
                 LOGE("parse: reply too small!\n");
                 return -1;
@@ -399,10 +404,10 @@ void binder_loop(struct binder_state *bs, binder_handler func)
         bwr.read_consumed = 0;
         bwr.read_buffer = (unsigned long) readbuf;
 
-        printf("ioctl BINDER_WRITE_READ start %ld, %ld, %ld\n", bwr.read_size, bwr.read_consumed, bwr.read_buffer);
-        printf("ioctl BINDER_WRITE_READ start %ld, %ld, %ld\n", bwr.write_size, bwr.write_consumed, bwr.write_buffer);
+        printf("ioctl BINDER_WRITE_READ start READ %ld, %ld, %ld\n", bwr.read_size, bwr.read_consumed, bwr.read_buffer);
+        printf("ioctl BINDER_WRITE_READ start WRITE %ld, %ld, %ld\n", bwr.write_size, bwr.write_consumed, bwr.write_buffer);
         res = ioctl(bs->fd, BINDER_WRITE_READ, &bwr);
-        printf("ioctl BINDER_WRITE_READ done\n");
+        printf("ioctl BINDER_WRITE_READ done res %d\n", res);
 
         if (res < 0) {
             LOGE("binder_loop: ioctl failed (%d)\n", errno);

@@ -154,6 +154,8 @@ int talkWithDriver(int doReceive)
     struct binder_transaction_data tr;
     struct flat_binder_object obj;
     char binderData[250];
+    char readData[256];
+    size_t binderObjs[10];
     size_t nameLen = strlen("default");
     size_t objLen = ALIGN(sizeof(size_t)+strlen("default")+1+sizeof(size_t), sizeof(void *));
 
@@ -169,13 +171,14 @@ int talkWithDriver(int doReceive)
     
     memcpy((void*)binderData, &nameLen, sizeof(size_t));
     memcpy((void*)(binderData+sizeof(size_t)), "default", strlen("default")+1);
-    memcpy((void*)(binderData+ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *))), &objLen, sizeof(size_t));
-    memcpy((void*)(binderData+ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *))+sizeof(size_t)), &obj, sizeof(struct flat_binder_object));
+    //memcpy((void*)(binderData+ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *))), &objLen, sizeof(size_t));
+    memcpy((void*)(binderData+ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *))), &obj, sizeof(struct flat_binder_object));
+    binderObjs[0] = ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *));
     
-    tr.data_size = ALIGN(ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *))+sizeof(size_t)+sizeof(struct flat_binder_object), sizeof(void *));
+    tr.data_size = ALIGN(ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *))+sizeof(struct flat_binder_object), sizeof(void *));
     tr.data.ptr.buffer = binderData;
-    tr.offsets_size = ALIGN(sizeof(struct flat_binder_object)+sizeof(size_t), sizeof(size_t));
-    tr.data.ptr.offsets = binderData+ALIGN(sizeof(size_t)+strlen("default")+1, sizeof(void *));
+    tr.offsets_size = sizeof(size_t);
+    tr.data.ptr.offsets = binderObjs;
     printf("tr.type 0x%08x%08x\n", (int)(obj.type>>32), (int)obj.type);
     printf("tr.data_size 0x%08x%08x\n", (int)(tr.data_size>>32), (int)tr.data_size);
     printf("tr.tr.data.ptr.buffer %p\n", tr.data.ptr.buffer);
@@ -187,6 +190,7 @@ int talkWithDriver(int doReceive)
     bwr.write_size = sizeof(tr) + 4; //outAvail;
     bwr.write_buffer = (unsigned long)transactData;
 
+    bwr.read_size = 0;
     // Return immediately if there is nothing to do.
     if ((bwr.write_size == 0) && (bwr.read_size == 0)) return NO_ERROR;
     
@@ -222,13 +226,13 @@ int talkWithDriver(int doReceive)
     //transactData[1] = 1;
     //transactData[2] = 2;
     //transactData[3] = 3;
-    bwr.write_size = sizeof(tr) + 4; //outAvail;
+    bwr.write_size = 0; //sizeof(tr) + 4; //outAvail;
     bwr.write_buffer = (unsigned long)transactData;
 
     // This is what we'll read.
     //if (doReceive && needRead) {
-    //    bwr.read_size = mIn.dataCapacity();
-    //    bwr.read_buffer = (long unsigned int)mIn.data();
+        bwr.read_size = 256;
+        bwr.read_buffer = (long unsigned int)readData;
     //} else {
     //    bwr.read_size = 0;
     //}
@@ -238,12 +242,12 @@ int talkWithDriver(int doReceive)
     
     bwr.write_consumed = 0;
     bwr.read_consumed = 0;
-    do {
-        if (ioctl(DriverFD, BINDER_WRITE_READ, &bwr) >= 0)
-            err = NO_ERROR;
-        else
-            err = -errno;
-    } while (err == -EINTR);
+    //do {
+    //    if (ioctl(DriverFD, BINDER_WRITE_READ, &bwr) >= 0)
+    //        err = NO_ERROR;
+    //    else
+    //        err = -errno;
+    //} while (err == -EINTR);
 
     if (err >= NO_ERROR) {
 //        if (bwr.write_consumed > 0) {
